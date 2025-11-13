@@ -304,6 +304,7 @@ plt.savefig('bias_variance_cv_curve.png', bbox_inches='tight', dpi=150)
 
 print("\nPlot generated and saved as 'bias_variance_cv_curve.png'")
 
+"""
 # --- Code Snippet for Inspecting ALL Model Parameters ---
 
 print("\n" + "=" * 50)
@@ -311,7 +312,7 @@ print("START: Inspecting Parameters for All Models")
 print("=" * 50 + "\n")
 
 # THIS PART IS NOT IN THE LAB, I DID THIS SO I CAN OBSERVE THE PARAMETERS ETC. RUNNING THIS WOULD BE COMP. EXPENSIVE
-"""
+
 
 try:
     # This loop will train and print parameters for each degree
@@ -354,3 +355,58 @@ except Exception as e:
 
  --- End of Snippet --- 
  """
+
+# --- Step 4: 10-Fold Cross-Validation + Comparison Plot (Using just the minimum RMSE, without stability penalty---
+# Yields a 6th degree solution as it explains the data better, however, with it is not selected when
+# stability penalties are applied because a 6th degree solution is computationally expensive and thus,
+# less reliable to use than a first 1st degree one.
+# When the scores are close like our tests, some approaches will choose the 1st degree one although it does not
+# output the best score. penalized = mean + std / optimal = np.argmin(penalized) or even One-SE rule.
+# This is why higher degree models are called high variance, they simply have higher variance / std.
+
+from sklearn.model_selection import cross_val_score, KFold
+
+cv = KFold(n_splits=10, shuffle=True, random_state=42)
+
+cv_errors_mean = []
+cv_errors_std = []
+
+print("\n--- Starting 10-Fold Cross-Validation ---")
+print(f"{'Degree':<8} | {'Mean CV RMSE':<15} | {'Std Dev':<10}")
+print("-" * 40)
+
+for degree in degrees:
+    model_pipeline = Pipeline([
+        ('poly', PolynomialFeatures(degree=degree, include_bias=False)),
+        ('scaler', StandardScaler()),
+        ('model', LinearRegression())
+    ])
+
+    # cross_val_score returns negative MSE → convert to RMSE
+    neg_mse_scores = cross_val_score(
+        model_pipeline, X, y,
+        scoring='neg_mean_squared_error',
+        cv=cv,
+        n_jobs=-1
+    )
+
+    rmse_scores = np.sqrt(-neg_mse_scores)
+    mean_rmse = rmse_scores.mean()
+    std_rmse = rmse_scores.std()
+
+    cv_errors_mean.append(mean_rmse)
+    cv_errors_std.append(std_rmse)
+
+    print(f"{degree:<8} | {mean_rmse:<15.4f} | {std_rmse:<10.4f}")
+
+# --- Automatically select the optimal degree ---
+optimal_index = np.argmin(cv_errors_mean)
+optimal_degree = degrees[optimal_index]
+min_rmse = cv_errors_mean[optimal_index]
+std_at_optimal = cv_errors_std[optimal_index]
+
+# --- Print the optimal result ---
+print("\n--- Optimal Model from Cross-Validation ---")
+print(f"Optimal polynomial degree: {optimal_degree}")
+print(f"Minimum mean CV RMSE: {min_rmse:.4f}")
+print(f"Standard deviation at this degree: {std_at_optimal:.4f}")
